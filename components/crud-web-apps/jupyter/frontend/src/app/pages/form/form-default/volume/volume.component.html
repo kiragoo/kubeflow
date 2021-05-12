@@ -1,31 +1,31 @@
-<div *ngIf="volume" [formGroup]="volume" class="row">
-  <mat-form-field class="column" appearance="outline" id="type">
+<div *ngIf="volume" [formGroup]="volume" class="volume-wrapper">
+  <mat-form-field appearance="outline" id="type">
     <mat-label>Type</mat-label>
     <mat-select formControlName="type">
-      <mat-option *ngIf="defaultStorageClass" value="New">New</mat-option>
+      <mat-option
+        [disabled]="newTypeIsDisabled()"
+        [matTooltip]="newTypeTooltip()"
+        value="New"
+        >New</mat-option
+      >
       <mat-option value="Existing">Existing</mat-option>
     </mat-select>
   </mat-form-field>
 
   <!-- Volume Name Input -->
-  <lib-name-input
-    class="column"
-    [nameControl]="volume.get('name')"
-    id="name"
-  ></lib-name-input>
+  <mat-form-field appearance="outline" id="name">
+    <mat-label>Name</mat-label>
+    <input matInput formControlName="name" />
+  </mat-form-field>
 
   <!-- Size Input -->
-  <lib-positive-number-input
-    id="size"
-    class="column"
-    min="1"
-    step="1"
-    [sizeControl]="volume.get('size')"
-    label="Size in Gi"
-  ></lib-positive-number-input>
+  <mat-form-field appearance="outline" id="size">
+    <mat-label>Size</mat-label>
+    <input matInput formControlName="size" />
+  </mat-form-field>
 
   <!-- Mode Input -->
-  <mat-form-field class="column" appearance="outline" id="mode">
+  <mat-form-field appearance="outline" id="mode">
     <mat-label>Mode</mat-label>
     <mat-select formControlName="mode">
       <mat-option value="ReadWriteOnce">ReadWriteOnce</mat-option>
@@ -35,7 +35,7 @@
   </mat-form-field>
 
   <!-- Mount Input -->
-  <mat-form-field class="column" appearance="outline" id="path">
+  <mat-form-field appearance="outline" id="path">
     <mat-label>Mount Point</mat-label>
     <input matInput formControlName="path" />
   </mat-form-field>
