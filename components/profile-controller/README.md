@@ -92,3 +92,9 @@ Plugin owners have full control over plugin spec struct and implementation.
   - Type: credential binding
   - IAM For Service Account plugin will grant k8s service account permission of IAM role,
   so pods in profile namespace can authenticate AWS services as IAM role.
+    
+# `Profile` 支持 `ElasticQuota`
+>验证版本 `k8s v1.19.8` `scheduler plugins release-1.19`
+在此分支中，增加一种 `QuotaType` 为`ElasticQuota`，关于[`ElasticQuota`](https://github.com/kubernetes-sigs/scheduler-plugins/blob/release-1.19/pkg/apis/scheduling/v1alpha1/types.go)
+用于实现多租户之间能够跨`namespace`实现资源的*借用*，具体的描述可以详见[kubernetes跨namespace资源借用及资源归还控制](https://kiragoo.github.io/archives/f656d80b.html)
+

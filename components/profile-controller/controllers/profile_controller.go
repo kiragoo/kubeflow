@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	profilev1 "github.com/kubeflow/kubeflow/components/profile-controller/api/v1"
+	"github.com/kubeflow/kubeflow/components/profile-controller/api/v1alpha1"
 	istioSecurity "istio.io/api/security/v1beta1"
 	istioSecurityClient "istio.io/client-go/pkg/apis/security/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -47,7 +48,8 @@ const AUTHZPOLICYISTIO = "ns-owner-access-istio"
 // Istio constants
 const ISTIOALLOWALL = "allow-all"
 
-const KFQUOTA = "kf-resource-quota"
+const KFRQUOTA = "kf-resource-quota"
+const KFESQUOTA = "kf-elastic-quota"
 const PROFILEFINALIZER = "profile-finalizer"
 
 // annotation key, consumed by kfam API
@@ -242,23 +244,48 @@ func (r *ProfileReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error)
 		IncRequestErrorCounter("error updating Owner Rolebinding", SEVERITY_MAJOR)
 		return reconcile.Result{}, err
 	}
-	// Create resource quota for target namespace if resources are specified in profile.
-	if len(instance.Spec.ResourceQuotaSpec.Hard) > 0 {
-		resourceQuota := &corev1.ResourceQuota{
+
+	if !validateQuotaType(instance) {
+		logger.Error(err, "error the quotaSpec validate error", "namespace", instance.Name, "name",
+			"defaultEdittor")
+		return ctrl.Result{}, err
+	}
+
+	if instance.Spec.ResourceQuotaSpec != nil {
+		// Create resource quota for target namespace if resources are specified in profile.
+		if len(instance.Spec.ResourceQuotaSpec.Hard) > 0 {
+			resourceQuota := &corev1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      KFRQUOTA,
+					Namespace: instance.Name,
+				},
+				Spec: *instance.Spec.ResourceQuotaSpec,
+			}
+			if err = r.updateResourceQuota(instance, resourceQuota); err != nil {
+				logger.Error(err, "error Updating resource quota", "namespace", instance.Name)
+				IncRequestErrorCounter("error updating resource quota", SEVERITY_MAJOR)
+				return reconcile.Result{}, err
+			}
+		} else {
+			logger.Info("No update on resource quota", "spec", instance.Spec.ResourceQuotaSpec.String())
+		}
+	} else if instance.Spec.ElasticQuotaSpec != nil {
+		elasticQuota := &v1alpha1.ElasticQuota{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      KFQUOTA,
+				Name:      KFESQUOTA,
 				Namespace: instance.Name,
 			},
-			Spec: instance.Spec.ResourceQuotaSpec,
+			Spec: *instance.Spec.ElasticQuotaSpec,
 		}
-		if err = r.updateResourceQuota(instance, resourceQuota); err != nil {
-			logger.Error(err, "error Updating resource quota", "namespace", instance.Name)
-			IncRequestErrorCounter("error updating resource quota", SEVERITY_MAJOR)
+		if err = r.updateElasticQuota(instance, elasticQuota); err != nil {
+			logger.Error(err, "error Updating elastic quota", "namespace", instance.Name)
+			IncRequestErrorCounter("error updating elastic quota", SEVERITY_MAJOR)
 			return reconcile.Result{}, err
 		}
 	} else {
 		logger.Info("No update on resource quota", "spec", instance.Spec.ResourceQuotaSpec.String())
 	}
+
 	if err := r.PatchDefaultPluginSpec(ctx, instance); err != nil {
 		IncRequestErrorCounter("error patching DefaultPluginSpec", SEVERITY_MAJOR)
 		logger.Error(err, "Failed patching DefaultPluginSpec", "namespace", instance.Name)
@@ -454,6 +481,39 @@ func (r *ProfileReconciler) updateResourceQuota(profileIns *profilev1.Profile,
 	return nil
 }
 
+// updateElasticQuota create or update ElasticQuota for target namespace
+func (r *ProfileReconciler) updateElasticQuota(profileIns *profilev1.Profile,
+	elasticQuota *v1alpha1.ElasticQuota) error {
+	ctx := context.Background()
+	logger := r.Log.WithValues("profile", profileIns.Name)
+	if err := controllerutil.SetControllerReference(profileIns, elasticQuota, r.Scheme); err != nil {
+		return err
+	}
+	found := &v1alpha1.ElasticQuota{}
+	err := r.Get(ctx, types.NamespacedName{Name: elasticQuota.Name, Namespace: elasticQuota.Namespace}, found)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Info("Creating ElasticQuota", "namespace", elasticQuota.Namespace, "name", elasticQuota.Name)
+			err = r.Create(ctx, elasticQuota)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	} else {
+		if !(reflect.DeepEqual(elasticQuota.Spec, found.Spec)) {
+			found.Spec = elasticQuota.Spec
+			logger.Info("Updating elasticQuota", "namespace", elasticQuota.Namespace, "name", elasticQuota.Name)
+			err = r.Update(ctx, found)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // updateServiceAccount create or update service account "saName" with role "ClusterRoleName" in target namespace owned by "profileIns"
 func (r *ProfileReconciler) updateServiceAccount(profileIns *profilev1.Profile, saName string,
 	ClusterRoleName string) error {
@@ -629,4 +689,11 @@ func updateNamespaceLabels(ns *corev1.Namespace) bool {
 		}
 	}
 	return updated
+}
+
+func validateQuotaType(instance *profilev1.Profile) bool {
+	if (instance.Spec.ResourceQuotaSpec == nil) != (instance.Spec.ElasticQuotaSpec == nil) {
+		return true
+	}
+	return false
 }

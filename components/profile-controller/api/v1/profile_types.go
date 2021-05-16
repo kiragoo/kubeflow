@@ -16,6 +16,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/kubeflow/kubeflow/components/profile-controller/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +44,10 @@ type ProfileSpec struct {
 	Plugins []Plugin `json:"plugins,omitempty"`
 
 	// Resourcequota that will be applied to target namespace
-	ResourceQuotaSpec v1.ResourceQuotaSpec `json:"resourceQuotaSpec,omitempty"`
+	ResourceQuotaSpec *v1.ResourceQuotaSpec `json:"resourceQuotaSpec,omitempty"`
+
+	// ElasticQuota that will be applied to target namespace
+	ElasticQuotaSpec *v1alpha1.ElasticQuotaSpec `json:"elasticQuotaSpec,omitempty"`
 }
 
 const (
