@@ -20,6 +20,7 @@ import (
 	"os"
 
 	profilev1 "github.com/kubeflow/kubeflow/components/profile-controller/api/v1"
+	"github.com/kubeflow/kubeflow/components/profile-controller/api/v1alpha1"
 	"github.com/kubeflow/kubeflow/components/profile-controller/controllers"
 	istioSecurityClient "istio.io/client-go/pkg/apis/security/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,6 +45,7 @@ func init() {
 
 	_ = profilev1.AddToScheme(scheme)
 	_ = istioSecurityClient.AddToScheme(scheme)
+	_ = v1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
